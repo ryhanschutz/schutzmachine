@@ -1,0 +1,31 @@
+# ==============================================================================
+# SchutzMachine — .gitignore
+# ==============================================================================
+
+# Pacotes externos de datasheets/manuais pesados (~480 MB) — links oficiais no README.md
+ref/
+
+# Backups automáticos do Blender
+*.blend1
+*.blend2
+*.blend@
+
+# Python / Scripts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# PlatformIO / ESP-IDF / Firmware (futuro)
+.pio/
+build/
+sdkconfig.old
+
+# IDEs & Sistema Operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
