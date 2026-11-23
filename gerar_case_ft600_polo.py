@@ -75,9 +75,20 @@ LED5MM_STOP_THICK = 2.6     # Espessura do batente frontal (deixa a ponta redond
 SHIFT_LED_PITCH = 8.2       # Espaçamento centro-a-centro entre os 10 LEDs de 5mm (9 x 8.2 = 73.8 mm total)
 SHIFT_LED_Y = 38.0          # Altura Y central da barra de LEDs no arco superior (8.4 mm acima da borda superior do PCB!)
 SHIFT_LED_ARCH = 1.6        # Curvatura suave em arco acompanhando o topo da FT600
-LED_CHANNEL_W = 86.0        # Comprimento da canaleta traseira para os terminais/resistores dos 10 LEDs 5mm
-LED_CHANNEL_H = 10.8        # Largura (altura Y) da canaleta traseira dos LEDs 5mm
+LED_CHANNEL_W = 102.0       # Comprimento da canaleta traseira para a PCB dos 10 LEDs 5mm (101.0 x 10.5 mm c/ abas M2.5)
+LED_CHANNEL_H = 11.2        # Largura (altura Y) da canaleta traseira para a PCB dos LEDs 5mm
 LED_CHANNEL_D = 4.6         # Profundidade da canaleta traseira na tampa frontal
+LED_PCB_BOSS_DX = 94.0      # Distância X entre os 2 postes de fixação M2.5 da PCB dos LEDs (±47.0 mm)
+LED_PCB_BOSS_OD = 6.8       # Diâmetro externo dos 2 postes para inserto térmico M2.5
+LED_PCB_PILOT_DIA = 3.3     # Furo Ø 3.3 mm para inserto metálico térmico M2.5 (OD 3.5–4.0 mm, compr. 3 mm)
+LED_PCB_SEAT_Z_OFF = 2.2    # Recuo atrás do batente do LED (1.0 mm colarinho + 1.2 mm folga p/ solda)
+
+# --- Torres de Fixação da PCB Carrier Traseira (112.0 x 52.0 mm, 4x M3) ---
+CARRIER_PCB_DX = 103.0      # Distância X entre os 4 furos M3 da PCB Carrier traseira (±51.5 mm)
+CARRIER_PCB_DY = 43.0       # Distância Y entre os 4 furos M3 da PCB Carrier traseira
+CARRIER_PCB_CENTER_Y = 18.0 # Centro Y da PCB Carrier (Y: -8.0 a +44.0 mm, 100% livre acima do GX16-4P)
+CARRIER_STANDOFF_H = 4.5    # Altura dos 4 suportes traseiros (afasta pinos de solda 4.5 mm do fundo)
+CARRIER_STANDOFF_OD = 7.6   # Diâmetro externo dos 4 suportes M3 da PCB Carrier
 
 # --- Torres Internas de Fixação (PCB M3 e Fechamento da Carcaça M3) ---
 M3_INSERT_DIA = 4.2         # Furo para inserto metálico térmico M3 (OD ~4.2-4.5 mm)
@@ -662,6 +673,23 @@ def build_ft600_polo_case():
         )
         apply_boolean(obj_front, cut_led_flange, 'DIFFERENCE')
 
+    # 1.4b Dois postes M2.5 nas pontas da canaleta para parafusar a PCB dos 10 LEDs (101.0 x 10.5 mm, passo 94.0 mm)
+    # Assento da PCB em Z = z_socket_top - LED_PCB_SEAT_Z_OFF (+8.5 mm: 1.0 mm colarinho + 1.2 mm folga p/ solda)
+    z_led_pcb_seat = z_socket_top - LED_PCB_SEAT_Z_OFF
+    led_boss_z_top = z_visor_floor - 0.8
+    led_boss_h = led_boss_z_top - z_led_pcb_seat
+    for idx, lx_boss in enumerate((-LED_PCB_BOSS_DX / 2.0, LED_PCB_BOSS_DX / 2.0)):
+        lboss = make_cylinder(
+            f"Boss_LED_PCB_{idx+1}", LED_PCB_BOSS_OD / 2.0, led_boss_h,
+            (lx_boss, SHIFT_LED_Y, z_led_pcb_seat + led_boss_h / 2.0), col_tmp, segments=24
+        )
+        apply_boolean(obj_front, lboss, 'UNION')
+        lhole = make_cylinder(
+            f"Hole_LED_PCB_M25_{idx+1}", LED_PCB_PILOT_DIA / 2.0, led_boss_h + 0.6,
+            (lx_boss, SHIFT_LED_Y, z_led_pcb_seat + led_boss_h / 2.0 - 0.5), col_tmp, segments=20
+        )
+        apply_boolean(obj_front, lhole, 'DIFFERENCE')
+
     # 1.5 Degrau traseiro de alinhamento (encaixe com o 02_anel_vermelho)
     pts_lip_outer = ft600_contour_points(
         CASE_W - 2.0 * (RING_WALL_W - RING_LIP_W - TOLERANCE_3D * 0.5),
@@ -954,70 +982,25 @@ def build_ft600_polo_case():
     )
     apply_boolean(obj_rear, cut_sd, 'DIFFERENCE')
 
-    # 3.6 Berço interno #1 (snap-fit) na direita traseira para o módulo CAN SN65HVD230 (16.5 x 14.5 x 6.0 mm)
-    def add_snap_cradle(parent_obj, prefix, mod_w, mod_h, cradle_h, wall_t, cx, cy):
-        in_w = mod_w + TOLERANCE_3D
-        in_h = mod_h + TOLERANCE_3D
-        out_w = in_w + 2.0 * wall_t
-        out_h = in_h + 2.0 * wall_t
-
-        c_out = make_box(
-            f"{prefix}_Outer",
-            (out_w, out_h, cradle_h),
-            (cx, cy, z_rear_floor + cradle_h / 2.0 - 0.2),
-            col_tmp,
+    # 3.6 Berços antigos removidos (todos os módulos agora são montados na PCB Carrier Traseira via 4x torres M3 abaixo)
+    # 3.6b Quatro torres internas M3 (H=4.5 mm) para parafusar a PCB Carrier Traseira (112.0 x 52.0 mm, furos 103 x 43 mm)
+    carrier_boss_coords = [
+        (-CARRIER_PCB_DX / 2.0, CARRIER_PCB_CENTER_Y - CARRIER_PCB_DY / 2.0),
+        ( CARRIER_PCB_DX / 2.0, CARRIER_PCB_CENTER_Y - CARRIER_PCB_DY / 2.0),
+        ( CARRIER_PCB_DX / 2.0, CARRIER_PCB_CENTER_Y + CARRIER_PCB_DY / 2.0),
+        (-CARRIER_PCB_DX / 2.0, CARRIER_PCB_CENTER_Y + CARRIER_PCB_DY / 2.0),
+    ]
+    for idx, (cx, cy) in enumerate(carrier_boss_coords):
+        sboss = make_cylinder(
+            f"Boss_CarrierPCB_{idx+1}", CARRIER_STANDOFF_OD / 2.0, CARRIER_STANDOFF_H + 0.4,
+            (cx, cy, z_rear_floor + CARRIER_STANDOFF_H / 2.0 - 0.2), col_tmp, segments=28
         )
-        apply_boolean(parent_obj, c_out, 'UNION')
-
-        c_pock = make_box(
-            f"{prefix}_Pocket",
-            (in_w, in_h, cradle_h + 1.0),
-            (cx, cy, z_rear_floor + cradle_h / 2.0 + 1.2),
-            col_tmp,
+        apply_boolean(obj_rear, sboss, 'UNION')
+        shole = make_cylinder(
+            f"Hole_CarrierPCB_M3_{idx+1}", M3_INSERT_DIA / 2.0, CARRIER_STANDOFF_H + 0.8,
+            (cx, cy, z_rear_floor + CARRIER_STANDOFF_H / 2.0 + 0.4), col_tmp, segments=24
         )
-        apply_boolean(parent_obj, c_pock, 'DIFFERENCE')
-
-        c_sx = make_box(
-            f"{prefix}_SlotX",
-            (out_w + 2.0, max(4.0, in_h - 5.0), cradle_h + 1.0),
-            (cx, cy, z_rear_floor + cradle_h / 2.0 + 1.6),
-            col_tmp,
-        )
-        apply_boolean(parent_obj, c_sx, 'DIFFERENCE')
-
-        c_sy = make_box(
-            f"{prefix}_SlotY",
-            (max(4.0, in_w - 6.0), out_h + 2.0, cradle_h + 1.0),
-            (cx, cy, z_rear_floor + cradle_h / 2.0 + 1.6),
-            col_tmp,
-        )
-        apply_boolean(parent_obj, c_sy, 'DIFFERENCE')
-
-    # Berço #1: Transceiver CAN SN65HVD230 (lado direito superior)
-    add_snap_cradle(obj_rear, "CAN_Cradle", CAN_W, CAN_H, CAN_CRADLE_H, CAN_CRADLE_WALL, CAN_CRADLE_X, CAN_CRADLE_Y)
-
-    # Berço #2: Regulador Step-Down MP1584EN 12V->5V (lado esquerdo inferior, longe do GX16 e da antena)
-    add_snap_cradle(obj_rear, "StepDown_Cradle", STEPDOWN_W, STEPDOWN_H, STEPDOWN_CRADLE_H, STEPDOWN_WALL, STEPDOWN_X, STEPDOWN_Y)
-
-    # Berço #3: Anel de retenção para Buzzer Piezo 12mm (saída Speak P7)
-    buz_ring_out = make_cylinder(
-        "Buzzer_Cradle_Out",
-        (BUZZER_DIA + TOLERANCE_3D) / 2.0 + BUZZER_WALL,
-        4.0,
-        (BUZZER_X, BUZZER_Y, z_rear_floor + 1.8),
-        col_tmp,
-        segments=28,
-    )
-    apply_boolean(obj_rear, buz_ring_out, 'UNION')
-    buz_ring_in = make_cylinder(
-        "Buzzer_Cradle_In",
-        (BUZZER_DIA + TOLERANCE_3D) / 2.0,
-        5.0,
-        (BUZZER_X, BUZZER_Y, z_rear_floor + 2.5),
-        col_tmp,
-        segments=28,
-    )
-    apply_boolean(obj_rear, buz_ring_in, 'DIFFERENCE')
+        apply_boolean(obj_rear, shole, 'DIFFERENCE')
 
     # 3.7 Gravação da Logo SchutzMachine em baixo-relevo nas costas da tampa traseira (acima do conector GX16-4P)
     cut_rear_logo = create_svg_logo_cutter(
